@@ -1,15 +1,24 @@
 # This function runs the experiments settings the values of particular traits to fixed values
 # Note tha the begin_leakage_experiment variable controls the timing of the leakage experiment - its default is to never set it so you should pay attention
 # Note that this special experimental leakage group also allows for some groups to be set diffrent from other groups
-function RunExperiment(;experiment = experiment, experiment_group = experiment_group, traits = traits,
- effort = effort, agents = agents, t= t, begin_leakage_experiment = begin_leakage_experiment,
- special_experiment_leak = special_experiment_leak, special_leakage_group = special_leakage_group,
+function RunExperiment(;
+ experiment = experiment,
+ experiment_group = experiment_group,
+ traits = traits,
+ effort = effort, agents = agents,
+ t= t,
+ begin_leakage_experiment = begin_leakage_experiment,
+ special_experiment_leak = special_experiment_leak,
+ special_leakage_group = special_leakage_group,
  experiment_effort =  experiment_effort,
  experiment_limit =  experiment_limit,
  experiment_punish1 =  experiment_punish1,
  experiment_punish2 =  experiment_punish2,
  experiment_leak =  experiment_leak,
- experiment_price = experiment_price
+ experiment_price = experiment_price,
+ special_experiment_effort = special_experiment_effort,
+ special_effort_group = special_effort_group,
+ 
  )
  if experiment
     for i = 1:length(experiment_group)
@@ -37,10 +46,18 @@ function RunExperiment(;experiment = experiment, experiment_group = experiment_g
         end
         if special_leakage_group != nothing
             for j in 1:length(special_leakage_group)
-                println(special_leakage_group)
+                # println(special_leakage_group)
                 traits.leakage_type[agents.gid .== special_leakage_group[j]] = rbinom(sum(agents.gid.==special_leakage_group[j]),1, special_experiment_leak)
             end
         end
+        if special_effort_group != nothing
+            for j in 1:length(special_effort_group)
+                # println(special_effort_group)
+                effort[agents.gid .== special_leakage_group[j], 2] .= special_experiment_effort
+                effort[agents.gid .== special_leakage_group[j], 1] .= 1-special_experiment_effort  
+            end
+        end
+        
     end
  end
  return effort, traits

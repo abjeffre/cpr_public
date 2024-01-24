@@ -40,14 +40,3 @@ function GetGroupForLearning(
     loc=asInt.(loc)
  end
 
-
- sort(countmap(GetGroupForLearning(param,
- agents,
- distances,
- distance_adj,
- false,
- [1])))
-
- param[:glearn_start] = "payoff"
-
- countmap(groups)
