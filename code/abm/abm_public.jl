@@ -132,7 +132,7 @@ function cpr_abm(
   price_copy = copy(price) # Record inital price
   nstart = copy(n) # Record inital n
   history=getHistoryBook(n = n, nrounds = nrounds, ngroups = ngroups,
-  nsim = nsim, full_save = full_save, pgrowth_data = pgrowth_data,
+  nsim = nsim, full_save = full_save, pgrowth_data = pgrowth_data, 
   rec_history = rec_history, population_growth = population_growth) # Make history books
     
   ##############################
@@ -149,7 +149,7 @@ function cpr_abm(
     #############################
     ##### Create the world ######
     world =  A = reshape(collect(1:ngroups), lattice[1], lattice[2])
-    distances = distance(world)
+    distances = distance(world)  # Calculate distance between groups
     if kmax_data !== nothing     #make the forests and DIVIDE them amongst the groups
       kmax = kmax_data
       K = copy(kmax)
@@ -158,7 +158,7 @@ function cpr_abm(
       kmax[kmax .< 0] .=max_forest/ngroups
       K = copy(kmax)
     end
-    resource_zero == true ?  K = rand(ngroups).+1 : nothing
+    resource_zero == true ?  K = rand(ngroups).+1 : nothing # If the resource starts at some arbitary number close to zero. 
 
     ################################
     ### Give birth to humanity #####
@@ -174,6 +174,7 @@ function cpr_abm(
       payoff_round = zeros(n),
       age = sample(1:2, n, replace=true) #notice a small variation in age is necessary for our motrality risk measure
       )
+    # Seed all traits
     effort, traits, traitTypes, traitTypesGroup = SeedTraits(n=n, ngroups=ngroups, agents = agents,  ngoods=ngoods,
                                                             gs_init = gs_init, limit_seed = limit_seed, harvest_var = harvest_var,
                                                             harvest_var_ind = harvest_var_ind, seed = seed, fine_start = fine_start,
@@ -189,12 +190,12 @@ function cpr_abm(
     children = Vector{Int}[]  # Set up Array To contain Family history
     for i in 1:n push!(children, Vector{Int}[]) end
     # Build in heterogentiy - fed in through data - 
-   # if length(labor) == 1 labor = fill(labor, ngroups) end
+    # if length(labor) == 1 labor = fill(labor, ngroups) end
     # if length(tech) == 1 tech = fill(tech, ngroups) end
     # if length(degrade) == 1 degrade = fill(degrade, ngroups) end
     #if length(wages) == 1 wages = fill(wages, ngroups) end
-   # if length(labor) == ngroups labor= labor[agents.gid] end
-    #if length(wages) == ngroups wages= wages[agents.gid] end   
+    # if length(labor) == ngroups labor= labor[agents.gid] end
+    # if length(wages) == ngroups wages= wages[agents.gid] end   
     #set defensibility
     def = zeros(ngroups)
     for i in 1:ngroups
@@ -208,9 +209,6 @@ function cpr_abm(
     if kseed !==nothing K = copy(kseed) end
     
     if verbose ==true println(string("Sim: ", sim, ", Initiation: COMPLETED ")) end
-
-    #for testing purposes
-    caught2 = zeros(n)
 
     ############################################
     ############# Begin years ##################
@@ -234,7 +232,7 @@ function cpr_abm(
             experiment_punish2 =last_round_caught2[1]*seizure_pun2_correlation # Note that this .2 is a scalar 
           end
         end
-
+      # RUNS any experiments which the user has pre-determiend!
       effort, traits = RunExperiment(;experiment = experiment,
                                       experiment_group = experiment_group,
                                       traits = traits,
@@ -256,40 +254,47 @@ function cpr_abm(
       if verbose== true print(string("Experiment: COMPLETED"))end      
       ####################
       #### Politics #######
-      groups.limit=GetPolicy(traits.harv_limit, policy_weight, agents.payoff, ngroups, agents.gid, groups.group_status, t)
+      groups.limit=GetPolicy(traits.harv_limit, policy_weight, agents.payoff, ngroups, agents.gid, groups.group_status, t) # Determines groups MAH
       if fines_evolve == true
-        groups.fine1=GetPolicy(traits.fines1, policy_weight, agents.payoff, ngroups, agents.gid, groups.group_status, t)
+        # Allows fines to evolve
+        # Turned off in NAT SUS
+        groups.fine1=GetPolicy(traits.fines1, policy_weight, agents.payoff, ngroups, agents.gid, groups.group_status, t) 
         groups.fine2=GetPolicy(traits.fines2, policy_weight, agents.payoff, ngroups, agents.gid, groups.group_status, t)
       else
+         # Turned off in NAT SUS
+         # Fine is just set as a parameter and does not evolve.
         groups.fine1 = ones(ngroups).*fine 
         groups.fine2 = ones(ngroups).*fine 
       end     
       ########################
       #### Patch Selection ###
+      # all agents who are bandits select a location where they harvest from!
       loc=GetPatch(ngroups, agents.gid, groups.group_status, distances, distance_adj,
                 traits.leakage_type, K, groups_sampled, experiment, exclude_patches, back_leak)
-      TC=travel_cost.*traits.leakage_type
+      TC=travel_cost.*traits.leakage_type # agents who are bandits get their travel cost assigned
       # Determine the timing of inspections
-      if inspect_timing == nothing
+      if inspect_timing == nothing # If inspect_timing is nothing then we simply randomize whether BANDITS are caught before or after they harvest. 
         catch_before = sample([true, false]) # Randomize Whether people this round are caught before or after harvests
       else
-        if inspect_timing == "before" catch_before = true end
+        if inspect_timing == "before" catch_before = true end 
         if inspect_timing == "after" catch_before = false end
       end
       ###########################
       #### Harvesting ###########
       if catch_before == true
+        # IF catch before happens - then all BANDITS are caught before they have a chance to harvest and thus their harvest is not removed from the stock
         temp_hg = zeros(n)
-        caught1=GetInspection(temp_hg, traits.punish_type, loc, agents.gid, groups.limit, monitor_tech, groups.def, "nonlocal")
+        caught1=GetInspection(temp_hg, traits.punish_type, loc, agents.gid, groups.limit, monitor_tech, groups.def, "nonlocal") # Determines if agents are caught
         temp_effort = effort[:,2] .* (1 .-caught1)
-        if harvest_type == "collective"
-          GH=GetGroupHarvest(temp_effort, loc, K, kmax, tech, labor, degrade, ngroups)
-          HG=GetIndvHarvest(GH, temp_effort, loc, necessity, ngroups)
-        else
-          HG=GetHarvest(temp_effort, loc, K, kmax, tech, labor, degrade, necessity, ngroups, agents)
-          GH=reportSum(HG, loc, ngroups)
+        if harvest_type == "collective" # harvest type collective has some rudiementary congestion effects - I would recommend Implementing a proper congetion function which is coming in future updates.
+          GH=GetGroupHarvest(temp_effort, loc, K, kmax, tech, labor, degrade, ngroups) # Determines total harvest per group
+          HG=GetIndvHarvest(GH, temp_effort, loc, necessity, ngroups) # Determines individual level harevests
+        else # Do the normal harvesting
+          HG=GetHarvest(temp_effort, loc, K, kmax, tech, labor, degrade, necessity, ngroups, agents) # Just gets the normal indiviudal level harvest
+          GH=reportSum(HG, loc, ngroups) # Determines the groups harvest!
         end
       else
+        # Now we repate the same as above but we make sure that we remove the harvest from the bandits whether they are caught or not!
         if harvest_type == "collective"
           GH=GetGroupHarvest(effort[:,2], loc, K, kmax, tech, labor, degrade, ngroups)
           HG=GetIndvHarvest(GH, effort[:,2], loc, necessity, ngroups)
@@ -301,27 +306,29 @@ function cpr_abm(
       ########################################
       #### Inspection, Seizure and Fines ######
       if catch_before == false  
-        caught1=GetInspection(HG, traits.punish_type, loc, agents.gid, groups.limit, monitor_tech, groups.def, "nonlocal") 
+        caught1=GetInspection(HG, traits.punish_type, loc, agents.gid, groups.limit, monitor_tech, groups.def, "nonlocal") # determines if bandits are caught 
       end
-      caught2=GetInspection(HG, traits.punish_type2, loc, agents.gid, groups.limit, monitor_tech, groups.def, "local")
-      pun1_on ? nothing : caught1 .= 0
-      pun2_on ? nothing : caught2 .= 0
-      caught_sum = ifelse.((caught1 + caught2) .> 0, 1, 0)
-      if catch_before == true  
-        seized1=GetGroupSeized(caught1, caught1, loc, ngroups) 
+      caught2=GetInspection(HG, traits.punish_type2, loc, agents.gid, groups.limit, monitor_tech, groups.def, "local") # determines if in group members are caught!
+      pun1_on ? nothing : caught1 .= 0 # Switches access rights off
+      pun2_on ? nothing : caught2 .= 0 # Switches use rights off
+      caught_sum = ifelse.((caught1 + caught2) .> 0, 1, 0) # Gets the total number of agents caught for reporting
+      if catch_before == true   
+        seized1=GetGroupSeized(caught1, caught1, loc, ngroups)  #Calculates the amount of goods seized when catch_before == TRUE
       else
-        seized1=GetGroupSeized(HG, caught1, loc, ngroups) #REVERT
+        seized1=GetGroupSeized(HG, caught1, loc, ngroups)   #Calculates the amount of goods seized when catch_false == TRUE
       end
-      seized2=GetGroupSeized(HG, caught2, loc, ngroups)
+      seized2=GetGroupSeized(HG, caught2, loc, ngroups) # Caclulates the seizure from enforcing use-rights
       if bsm == "individual"
-        SP1=GetSeizedPay(seized1, traits.punish_type, agents.gid, ngroups)
-        SP2=GetSeizedPay(seized2, traits.punish_type2, agents.gid, ngroups)
-        FP1=GetFinesPay(SP1, groups.fine1, agents.gid, ngroups)
-        FP2=GetFinesPay(SP2, groups.fine2, agents.gid, ngroups)
+        # Here benifits are paid out according to indiviudal contributions
+        SP1=GetSeizedPay(seized1, traits.punish_type, agents.gid, ngroups) # Access rights payout from seizures 
+        SP2=GetSeizedPay(seized2, traits.punish_type2, agents.gid, ngroups) # Use rights  payout from seizures
+        FP1=GetFinesPay(SP1, groups.fine1, agents.gid, ngroups) # Calculates fines payout if allowed - use rights
+        FP2=GetFinesPay(SP2, groups.fine2, agents.gid, ngroups) # Calculates fines payout if allowd  - use rights
         
       end
 
       if bsm == "collective"
+        # If collective then everyone gets the same regardless of their contributions
         group_size = convert(Int64, n/ngroups)
         SP1 = seized1./group_size
         SP2 = seized2./group_size
@@ -332,17 +339,19 @@ function cpr_abm(
         FP1 = FP1[agents.gid]
         FP2 = FP2[agents.gid]
       end
+      # This calculates the costs of investing in insitutions!
       MC1 = punish_cost*traits.punish_type
       MC2 = punish_cost*traits.punish_type2
       if seized_on == false 
-        SP2 = SP1 = zeros(n)
+        SP2 = SP1 = zeros(n) # Sets all siezures to zero if turned off
        end
-      if fines_on == false FP2 = FP1 = zeros(n) end
-      if catch_before == true SP1 .=0 end
+      if fines_on == false FP2 = FP1 = zeros(n) end # Sets all fines to zero if turns off
+      if catch_before == true SP1 .=0 end # Backup to make sure that all seizures are zero if catch before happens as they cannot seize goods that are not harvested. 
       ##################################
       ######## ECOSYSTEM SERVICES ######
-      ecosys ? ECO =  GetEcoSysServ(ngroups, eco_slope, eco_C, K, kmax) :  ECO = zeros(n)
-      pollution ? POL =  GetPollution(effort[:,2], loc, ngroups, pol_slope, pol_C, K, kmax) : POL = zeros(n)     
+      # Not used in NAT SUS
+      ecosys ? ECO =  GetEcoSysServ(ngroups, eco_slope, eco_C, K, kmax) :  ECO = zeros(n) # ALLOWS FOR ADDITIONAL POSTIVE EXTERNALITIES FROM HIGH QUALITY RESOURCE STOCK
+      pollution ? POL =  GetPollution(effort[:,2], loc, ngroups, pol_slope, pol_C, K, kmax) : POL = zeros(n)  # ALLOWS FOR ADDITIONAL NEGATIVE EXTERNALITIES FROM LOW QUALITY RESOURCE STOCK    
       
       ##################################
       ########## CONGESTION ############
