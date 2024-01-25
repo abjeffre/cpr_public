@@ -1,5 +1,4 @@
-###########################################################################################################
-####### THE CULTURAL EVOLUTION OF COLLECTIVE PROPERTY RIGHTS FOR NATURAL RESOURCE GOVERNANCE ##############
+##### THE CULTURAL EVOLUTION OF COLLECTIVE PROPERTY RIGHTS FOR NATURAL RESOURCE GOVERNANCE ##############
 
 Welcome!
 
